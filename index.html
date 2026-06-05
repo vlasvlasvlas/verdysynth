@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Osciverde Snyth</title>
+  </head>
+  <body>
+    <main id="app" aria-label="Osciverde X-Y instrument">
+      <header class="topbar">
+        <strong>OSCIVERDE X-Y</strong>
+        <span>LIVE VECTOR AUDIO TOOL</span>
+        <button id="audioButton" class="icon-button" aria-label="Prender sonido" aria-pressed="false">○ SND</button>
+        <button id="gridToggle" class="icon-button active" aria-label="Apagar grilla" aria-pressed="true">▦</button>
+        <button id="helpToggle" class="icon-button" aria-label="Ayuda" aria-expanded="false" aria-controls="helpPanel">?</button>
+        <button id="configToggle" class="icon-button" aria-label="Configuración" aria-expanded="false" aria-controls="configPanel">⚙</button>
+      </header>
+
+      <section class="screen-section" aria-label="Pantalla X-Y">
+        <div id="liveTextBar" class="live-text-bar">
+          <label class="live-label" for="liveTextInput">CHAR INPUT</label>
+          <textarea id="liveTextInput" spellcheck="false" autocomplete="off">OSCI
+VERDE</textarea>
+          <div class="import-row">
+            <label class="import-btn" tabindex="0">TXT<input type="file" id="textImport" accept=".txt" /></label>
+            <span>SCROLL</span>
+            <input id="scrollSeconds" type="number" min="0.5" max="60" step="0.5" value="3" />
+            <span>S</span>
+            <button id="scrollToggle" class="icon-button" aria-pressed="false">▶</button>
+          </div>
+        </div>
+        <canvas id="scope" width="1200" height="820"></canvas>
+      </section>
+
+      <aside id="configPanel" class="control-section" aria-hidden="true">
+        <div class="meter-row">
+          <div class="lamp on"></div>
+          <div>
+            <h1>VECTOR INPUT</h1>
+            <p>L = X DEFLECTION / R = Y DEFLECTION</p>
+          </div>
+        </div>
+
+        <label class="config-volume">
+          <span>VOL GENERAL</span>
+          <input id="masterVolume" type="range" min="0" max="100" value="65" />
+        </label>
+
+        <fieldset class="mode-switch">
+          <legend>BEAM MODE</legend>
+          <label><input name="mode" type="radio" value="text" checked /> CHAR GEN</label>
+          <label><input name="mode" type="radio" value="draw" /> LIGHT PEN</label>
+          <label><input name="mode" type="radio" value="mix" /> MIX</label>
+          <label><input name="mode" type="radio" value="wave" /> WAVE GEN</label>
+        </fieldset>
+
+        <fieldset id="waveSection" class="wave-section hidden">
+          <legend>GENERADOR DE ONDA</legend>
+          <label>TIPO
+            <select id="waveType">
+              <option value="lissajous">LISSAJOUS</option>
+              <option value="square">CUADRADA</option>
+              <option value="saw">SIERRA</option>
+              <option value="triangle">TRIÁNGULO</option>
+            </select>
+          </label>
+          <label>FREQ X <input id="waveFreqX" type="number" min="1" max="16" value="3" /></label>
+          <label>FREQ Y <input id="waveFreqY" type="number" min="1" max="16" value="2" /></label>
+          <label>FASE <input id="wavePhase" type="range" min="0" max="360" value="90" /></label>
+          <label>ARMÓNICOS <input id="waveHarmonics" type="number" min="1" max="12" value="4" /></label>
+        </fieldset>
+
+        <div class="buttons">
+          <button id="clearButton">BORRAR DIBUJO</button>
+          <button id="randomButton">CAMBIAR</button>
+          <button id="gridToggle2" class="active" aria-label="Apagar grilla" aria-pressed="true">GRILLA ON</button>
+        </div>
+
+        <label class="auto-mutate">
+          <input id="autoMutate" type="checkbox" />
+          <span>AUTO</span>
+          <input id="autoSeconds" type="number" min="20" max="400" step="1" value="120" />
+          <span>BPM</span>
+        </label>
+
+        <fieldset class="drone-section">
+          <legend>DRONE OSC</legend>
+          <label class="drone-power"><input id="dronePower" type="checkbox" /> DRONE ON</label>
+          <label>TIPO
+            <select id="droneType">
+              <option value="sine">SINE</option>
+              <option value="sawtooth">SAW</option>
+              <option value="square">SQUARE</option>
+              <option value="triangle">TRIANGLE</option>
+              <option value="fm">FM</option>
+              <option value="am">AM</option>
+            </select>
+          </label>
+          <label>NOTA <select id="droneNote"></select></label>
+          <label>VOLUMEN <input id="droneLevel" type="range" min="0" max="65" value="18" /></label>
+          <label>TIMBRE <input id="droneColor" type="range" min="0" max="100" value="42" /></label>
+          <label>MOD <input id="droneMod" type="range" min="0" max="100" value="28" /></label>
+
+          <fieldset class="arp-section">
+            <legend>ARPEGIO</legend>
+            <label class="arp-power"><input id="arpPower" type="checkbox" /> ARP ON</label>
+            <label>ESCALA
+              <select id="arpScale">
+                <option value="major">MAYOR</option>
+                <option value="minor">MENOR</option>
+                <option value="pentatonic">PENTATÓN</option>
+                <option value="dorian">DÓRICA</option>
+                <option value="phrygian">FRIGIA</option>
+                <option value="chromatic">CROMÁTICA</option>
+              </select>
+            </label>
+            <label>MODO
+              <select id="arpMode">
+                <option value="up">SUBIR</option>
+                <option value="down">BAJAR</option>
+                <option value="updown">SUBE/BAJA</option>
+                <option value="random">RANDOM</option>
+              </select>
+            </label>
+            <label>OCTAVAS <input id="arpOctaves" type="number" min="1" max="4" value="2" /></label>
+          </fieldset>
+        </fieldset>
+
+        <div class="grid">
+          <label>TRAZO <input id="rate" type="range" min="80" max="2400" value="520" /></label>
+          <label>VOLUMEN XY <input id="gain" type="range" min="0" max="82" value="28" /></label>
+          <label>RASTRO <input id="decay" type="range" min="3" max="34" value="11" /></label>
+          <label>FOCUS <input id="focus" type="range" min="0" max="100" value="68" /></label>
+          <label>DEFORMAR <input id="warp" type="range" min="0" max="100" value="12" /></label>
+          <label>TEMBLOR <input id="jitter" type="range" min="0" max="100" value="6" /></label>
+          <label>DERIVA <input id="drift" type="range" min="0" max="100" value="16" /></label>
+          <label>AFTERGLOW <input id="feedback" type="range" min="0" max="92" value="66" /></label>
+        </div>
+
+        <fieldset class="fx-section">
+          <legend>FX</legend>
+          <label>REVERB <input id="fxReverbSend" type="range" min="0" max="100" value="0" /></label>
+          <label>R SIZE <input id="fxReverbSize" type="range" min="0" max="100" value="60" /></label>
+          <label>DELAY <input id="fxDelaySend" type="range" min="0" max="100" value="0" /></label>
+          <label>D TIME <input id="fxDelayTime" type="range" min="0" max="100" value="40" /></label>
+          <label>D FEED <input id="fxDelayFeed" type="range" min="0" max="90" value="35" /></label>
+        </fieldset>
+
+      </aside>
+
+      <section id="helpPanel" class="manual-panel" aria-hidden="true" role="dialog" aria-labelledby="manualTitle">
+        <div class="manual-paper">
+          <button id="helpClose" class="manual-close" aria-label="Cerrar manual">CLOSE</button>
+          <h2 id="manualTitle">OSCIVERDE X-Y / OPERATING NOTES</h2>
+          <p>
+            Este proyecto simula un instrumento de dibujo sonoro para pantalla CRT X-Y. La salida de audio izquierda mueve
+            el haz en X y la derecha lo mueve en Y. Lo visible no es una imagen fija: es el recorrido del haz más la
+            persistencia del fósforo.
+          </p>
+          <p>
+            CHAR GEN convierte texto en recorrido de haz. LIGHT PEN permite dibujar trazos vectoriales sobre el tubo.
+            MIX combina ambos. SND activa el motor WebAudio; conviene empezar con volumen bajo.
+          </p>
+          <p>
+            BEAM RATE cambia la velocidad de escritura. RASTRO y AFTERGLOW controlan cuánto queda el rastro fantasma.
+            FOCUS, DEFORMAR, TEMBLOR y DERIVA degradan el trazo como electrónica analógica vieja.
+          </p>
+          <p>
+            ARPEGIO: con AUTO ON y ARP ON, el drone recorre las notas de la escala elegida en el intervalo de AUTO.
+            TXT: importá un archivo de texto para hacer scroll automático de líneas con SCROLL.
+          </p>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
