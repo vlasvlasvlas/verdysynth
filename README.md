@@ -27,3 +27,6 @@ npm run dev
 ## Deploy
 
 GitHub Actions construye y publica en GitHub Pages en cada push a `main`.
+## License
+
+MIT License — © 2026 [Vladimiro Bellini](https://github.com/vlasvlasvlas). Free to use and modify, attribution required.
