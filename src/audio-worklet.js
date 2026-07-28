@@ -32,11 +32,10 @@ class XYOscillatorProcessor extends AudioWorkletProcessor {
 
   process(_, outputs) {
     const output = outputs[0];
-    const left = output[0];
-    const right = output[1] || output[0];
+    const mono = output[0];
     const count = Math.max(1, this.points.length / 2);
 
-    for (let index = 0; index < left.length; index += 1) {
+    for (let index = 0; index < mono.length; index += 1) {
       this.rate += (this.targetRate - this.rate) * 0.0009;
       this.gain += (this.targetGain - this.gain) * 0.0012;
       this.smooth += (this.targetSmooth - this.smooth) * 0.0008;
@@ -60,8 +59,9 @@ class XYOscillatorProcessor extends AudioWorkletProcessor {
       this.prevRight = rawRight;
       this.dcLeft = hpLeft;
       this.dcRight = hpRight;
-      left[index] = Math.tanh(hpLeft * 1.25) * 0.82;
-      right[index] = Math.tanh(hpRight * 1.25) * 0.82;
+      const dominant = Math.abs(hpLeft) > Math.abs(hpRight) ? hpLeft : hpRight;
+      const hpMono = (hpLeft + hpRight) * 0.35 + dominant * 0.65;
+      mono[index] = Math.tanh(hpMono * 1.55) * 0.88;
 
       this.phase += increment;
       if (this.phase >= count) this.phase -= count;

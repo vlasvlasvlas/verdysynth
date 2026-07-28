@@ -9,7 +9,7 @@ Instrumento de audio vectorial para navegador. Genera recorridos X-Y, los dibuja
 
 ## Controles
 
-- **SND** — activa el motor de audio (WebAudio API)
+- **PLAY / STOP** — activa o apaga el motor de audio (WebAudio API)
 - **VOL GENERAL** — único volumen continuo de salida
 - **AUTO** — muta parámetros automáticamente al ritmo del BPM configurado
 - **FX** — reverb y delay

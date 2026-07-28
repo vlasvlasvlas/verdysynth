@@ -10,8 +10,8 @@
       <header class="topbar">
         <strong>OSCIVERDE X-Y</strong>
         <span>LIVE VECTOR AUDIO TOOL</span>
-        <button id="audioButton" class="icon-button" aria-label="Prender sonido" aria-pressed="false">○ SND</button>
-        <button id="gridToggle" class="icon-button active" aria-label="Apagar grilla" aria-pressed="true">▦</button>
+        <button id="audioButton" class="icon-button" aria-label="Play" aria-pressed="false">PLAY</button>
+        <button id="gridToggle" class="icon-button" aria-label="Prender grilla" aria-pressed="false">▦</button>
         <button id="helpToggle" class="icon-button" aria-label="Ayuda" aria-expanded="false" aria-controls="helpPanel">?</button>
         <button id="configToggle" class="icon-button" aria-label="Configuración" aria-expanded="false" aria-controls="configPanel">⚙</button>
       </header>
@@ -70,7 +70,7 @@ VERDE</textarea>
 
         <div class="buttons">
           <button id="randomButton">CAMBIAR</button>
-          <button id="gridToggle2" class="active" aria-label="Apagar grilla" aria-pressed="true">GRILLA ON</button>
+          <button id="gridToggle2" aria-label="Prender grilla" aria-pressed="false">GRILLA OFF</button>
         </div>
 
         <label class="auto-mutate">
@@ -116,7 +116,7 @@ VERDE</textarea>
             entre ejes; ARMÓNICOS agrega esquinas y complejidad al trazo.
           </p>
           <p>
-            SND activa el motor WebAudio; conviene empezar con volumen bajo. La mezcla final sale en mono.
+            PLAY activa el motor WebAudio y STOP lo apaga. Conviene empezar con volumen bajo. La mezcla final sale en mono.
           </p>
           <p>
             BEAM RATE cambia la velocidad de escritura. RASTRO y AFTERGLOW controlan cuánto queda el rastro fantasma.

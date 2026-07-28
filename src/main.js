@@ -64,7 +64,7 @@ const state = {
   compressor: null,
   fx: {},
   audioOn: false,
-  gridOn: true,
+  gridOn: false,
   lastSent: 0,
   lastMutation: performance.now(),
   tick: 0,
@@ -360,7 +360,7 @@ async function startAudio() {
     await audioContext.audioWorklet.addModule(new URL("./audio-worklet.js", import.meta.url).href);
     const worklet = new AudioWorkletNode(audioContext, "xy-oscillator", {
       numberOfOutputs: 1,
-      outputChannelCount: [2],
+      outputChannelCount: [1],
     });
     const masterGain = audioContext.createGain();
     const compressor = audioContext.createDynamicsCompressor();
@@ -409,7 +409,7 @@ async function startAudio() {
     delayOut.connect(compressor);
 
     worklet.onprocessorerror = () => {
-      audioButton.textContent = "! SND";
+      audioButton.textContent = "ERR";
       audioButton.classList.remove("active");
       state.audioOn = false;
     };
@@ -425,9 +425,9 @@ async function startAudio() {
   state.audioOn = true;
   const now = state.audioContext.currentTime;
   smoothParam(state.masterGain.gain, masterTargetGain(), now, MASTER_RAMP);
-  audioButton.setAttribute("aria-label", "Apagar sonido");
+  audioButton.setAttribute("aria-label", "Stop");
   audioButton.setAttribute("aria-pressed", "true");
-  audioButton.textContent = "● SND";
+  audioButton.textContent = "STOP";
   audioButton.classList.add("active");
   sendParams();
   sendPoints(true);
@@ -438,9 +438,9 @@ function stopAudio() {
   const now = state.audioContext.currentTime;
   state.audioOn = false;
   smoothParam(state.masterGain.gain, 0, now, 0.05);
-  audioButton.setAttribute("aria-label", "Prender sonido");
+  audioButton.setAttribute("aria-label", "Play");
   audioButton.setAttribute("aria-pressed", "false");
-  audioButton.textContent = "○ SND";
+  audioButton.textContent = "PLAY";
   audioButton.classList.remove("active");
 }
 
