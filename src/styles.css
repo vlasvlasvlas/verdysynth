@@ -289,8 +289,6 @@ legend {
 }
 
 .mode-switch label,
-.drone-section .drone-power,
-.arp-section .arp-power,
 .auto-mutate {
   display: grid;
   grid-template-columns: 18px 1fr;
@@ -321,9 +319,7 @@ input[type="radio"] {
   margin-bottom: 8px;
 }
 
-.auto-mutate input[type="number"],
-.drone-section select,
-.arp-section select {
+.auto-mutate input[type="number"] {
   min-height: 24px;
   border: 1px solid #394433;
   border-radius: 0;
@@ -333,14 +329,7 @@ input[type="radio"] {
   font-size: 11px;
 }
 
-.drone-section {
-  display: grid;
-  gap: 7px;
-}
-
-.drone-section label,
 .grid label,
-.arp-section > label:not(.arp-power),
 .fx-section label {
   display: grid;
   grid-template-columns: 82px 1fr;
@@ -351,31 +340,12 @@ input[type="radio"] {
   text-transform: uppercase;
 }
 
-.drone-section .drone-power {
-  grid-template-columns: 18px 1fr;
-}
-
 .grid {
   display: grid;
   gap: 7px;
   padding: 8px;
   border: 1px solid #394433;
   background: #0a0f09;
-}
-
-.arp-section {
-  display: grid;
-  gap: 7px;
-}
-
-.arp-section input[type="number"] {
-  width: 52px;
-  min-height: 24px;
-  border: 1px solid #394433;
-  border-radius: 0;
-  background: #020602;
-  color: #c7d7b5;
-  padding: 0 4px;
 }
 
 .fx-section {

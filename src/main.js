@@ -5,7 +5,6 @@ const ctx = canvas.getContext("2d", { alpha: false });
 const liveTextBar = document.querySelector("#liveTextBar");
 const liveTextInput = document.querySelector("#liveTextInput");
 const audioButton = document.querySelector("#audioButton");
-const clearButton = document.querySelector("#clearButton");
 const randomButton = document.querySelector("#randomButton");
 const configToggle = document.querySelector("#configToggle");
 const helpToggle = document.querySelector("#helpToggle");
@@ -15,23 +14,11 @@ const helpPanel = document.querySelector("#helpPanel");
 const gridToggle = document.querySelector("#gridToggle");
 const gridToggle2 = document.querySelector("#gridToggle2");
 const masterVolume = document.querySelector("#masterVolume");
-const dronePower = document.querySelector("#dronePower");
-const droneType = document.querySelector("#droneType");
-const droneNote = document.querySelector("#droneNote");
-const droneControls = {
-  level: document.querySelector("#droneLevel"),
-  color: document.querySelector("#droneColor"),
-  mod: document.querySelector("#droneMod"),
-};
 const autoMutate = document.querySelector("#autoMutate");
 const autoSeconds = document.querySelector("#autoSeconds");
 const textImport = document.querySelector("#textImport");
 const scrollToggle = document.querySelector("#scrollToggle");
 const scrollSeconds = document.querySelector("#scrollSeconds");
-const arpPower = document.querySelector("#arpPower");
-const arpScale = document.querySelector("#arpScale");
-const arpMode = document.querySelector("#arpMode");
-const arpOctaves = document.querySelector("#arpOctaves");
 const waveSection = document.querySelector("#waveSection");
 const waveType = document.querySelector("#waveType");
 const waveFreqX = document.querySelector("#waveFreqX");
@@ -48,7 +35,6 @@ const fxControls = {
 const modeInputs = [...document.querySelectorAll("input[name='mode']")];
 const controls = {
   rate: document.querySelector("#rate"),
-  gain: document.querySelector("#gain"),
   decay: document.querySelector("#decay"),
   focus: document.querySelector("#focus"),
   warp: document.querySelector("#warp"),
@@ -62,28 +48,20 @@ const WAVE_RATIOS = [
   [4, 5], [5, 6], [5, 7], [7, 8], [2, 5], [3, 7], [4, 7], [5, 8],
 ];
 
-const SCALES = {
-  major: [0, 2, 4, 5, 7, 9, 11],
-  minor: [0, 2, 3, 5, 7, 8, 10],
-  pentatonic: [0, 2, 4, 7, 9],
-  dorian: [0, 2, 3, 5, 7, 9, 10],
-  phrygian: [0, 1, 3, 5, 7, 8, 10],
-  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-};
+const XY_OUTPUT_GAIN = 0.28;
+const MASTER_GAIN_SCALE = 0.006;
+const MASTER_RAMP = 0.06;
+const PARAM_RAMP = 0.05;
 
 const state = {
   mode: "text",
   textPoints: [],
   textRaster: [],
-  drawStrokes: [],
-  currentStroke: null,
-  pointerDown: false,
-  pointer: null,
   audioContext: null,
   worklet: null,
   masterGain: null,
+  monoOutput: null,
   compressor: null,
-  drone: null,
   fx: {},
   audioOn: false,
   gridOn: true,
@@ -97,8 +75,6 @@ const state = {
   importIndex: 0,
   importScrollTimer: null,
   scrollOn: false,
-  arpIndex: 0,
-  arpDirection: 1,
 };
 
 const textCanvas = document.createElement("canvas");
@@ -114,15 +90,24 @@ function controlValue(id, scale = 1) {
   return Number(controls[id].value) * scale;
 }
 
-function activeMode() {
-  return modeInputs.find((input) => input.checked)?.value || "text";
+function smoothParam(param, value, now, ramp = PARAM_RAMP) {
+  if (!param) return;
+  if (typeof param.cancelAndHoldAtTime === "function") {
+    param.cancelAndHoldAtTime(now);
+  } else {
+    const heldValue = param.value;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(heldValue, now);
+  }
+  param.linearRampToValueAtTime(value, now + ramp);
 }
 
-function normalizePoint(x, y, width = canvas.width, height = canvas.height) {
-  return {
-    x: clamp((x / width) * 2 - 1, -1, 1),
-    y: clamp((y / height) * -2 + 1, -1, 1),
-  };
+function masterTargetGain() {
+  return state.audioOn ? Number(masterVolume.value) * MASTER_GAIN_SCALE : 0;
+}
+
+function activeMode() {
+  return modeInputs.find((input) => input.checked)?.value || "text";
 }
 
 function denormalizePoint(point) {
@@ -130,21 +115,6 @@ function denormalizePoint(point) {
     x: (point.x * 0.5 + 0.5) * canvas.width,
     y: (-point.y * 0.5 + 0.5) * canvas.height,
   };
-}
-
-function buildNoteDropdown() {
-  const noteNames = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-  for (let octave = 1; octave <= 5; octave++) {
-    for (let n = 0; n < 12; n++) {
-      const midi = 24 + (octave - 1) * 12 + n;
-      const freq = 440 * Math.pow(2, (midi - 69) / 12);
-      const opt = document.createElement("option");
-      opt.value = freq.toFixed(2);
-      opt.textContent = noteNames[n] + octave;
-      if (noteNames[n] === "A" && octave === 1) opt.selected = true;
-      droneNote.appendChild(opt);
-    }
-  }
 }
 
 function createImpulseResponse(audioContext, duration, decay) {
@@ -288,21 +258,10 @@ function startScrollTimer() {
   }, ms);
 }
 
-function drawPointsFromStrokes() {
-  return state.drawStrokes.flatMap((stroke) =>
-    stroke.map((point, index) => ({
-      ...point,
-      move: index === 0,
-    })),
-  );
-}
-
 function sourcePoints() {
-  const drawPoints = drawPointsFromStrokes();
   if (state.mode === "text") return state.textPoints;
-  if (state.mode === "draw") return drawPoints.length ? drawPoints : state.textPoints.slice(0, 2);
   if (state.mode === "wave") return state.wavePoints.length ? state.wavePoints : [{ x: 0, y: 0, move: true }];
-  return [...state.textPoints, ...drawPoints];
+  return state.textPoints;
 }
 
 function modulatedPoints() {
@@ -366,142 +325,26 @@ function sendParams() {
   state.worklet.port.postMessage({
     type: "params",
     rate: controlValue("rate") * 90,
-    gain: controlValue("gain", 0.01),
+    gain: XY_OUTPUT_GAIN,
     smooth: 0.35 + controlValue("focus", 0.006),
   });
-}
-
-function droneValue(id, scale = 1) {
-  return Number(droneControls[id].value) * scale;
-}
-
-function disposeDrone() {
-  if (!state.drone) return;
-  const now = state.audioContext.currentTime;
-  state.drone.output.gain.cancelScheduledValues(now);
-  state.drone.output.gain.linearRampToValueAtTime(0, now + 0.04);
-  const drone = state.drone;
-  window.setTimeout(() => {
-    drone.nodes.forEach((node) => {
-      try {
-        if (typeof node.stop === "function") node.stop();
-        node.disconnect();
-      } catch {
-        // already gone
-      }
-    });
-  }, 80);
-  state.drone = null;
-}
-
-function createDroneGraph() {
-  if (!state.audioContext || !state.compressor) return;
-  disposeDrone();
-
-  const audioContext = state.audioContext;
-  const now = audioContext.currentTime;
-  const carrier = audioContext.createOscillator();
-  const modulator = audioContext.createOscillator();
-  const modGain = audioContext.createGain();
-  const amp = audioContext.createGain();
-  const filter = audioContext.createBiquadFilter();
-  const output = audioContext.createGain();
-  const lfo = audioContext.createOscillator();
-  const lfoGain = audioContext.createGain();
-  const nodes = [carrier, modulator, modGain, amp, filter, output, lfo, lfoGain];
-
-  carrier.type = ["sine", "sawtooth", "square", "triangle"].includes(droneType.value) ? droneType.value : "sine";
-  modulator.type = "sine";
-  lfo.type = "triangle";
-  filter.type = "lowpass";
-  output.gain.value = 0;
-  amp.gain.value = 1;
-
-  carrier.connect(amp).connect(filter).connect(output).connect(state.masterGain);
-  lfo.connect(lfoGain);
-
-  if (droneType.value === "fm") {
-    modulator.connect(modGain).connect(carrier.frequency);
-  } else if (droneType.value === "am") {
-    amp.gain.value = 0.75;
-    modulator.connect(modGain).connect(amp.gain);
-  } else {
-    lfoGain.connect(filter.frequency);
-  }
-
-  carrier.start(now);
-  modulator.start(now);
-  lfo.start(now);
-  state.drone = { carrier, modulator, modGain, amp, filter, output, lfo, lfoGain, nodes };
-  updateDroneParams(true);
-}
-
-function updateDroneParams(force = false) {
-  if (!state.drone || !state.audioContext) return;
-  const now = state.audioContext.currentTime;
-  const ramp = force ? 0.01 : 0.08;
-  const frequency = Number(droneNote.value);
-  const level = dronePower.checked ? droneValue("level", 0.0042) : 0;
-  const color = droneValue("color", 1);
-  const mod = droneValue("mod", 1);
-  const filterHz = 180 + color * 42;
-  const modHz = 0.08 + mod * 0.085;
-
-  state.drone.carrier.frequency.linearRampToValueAtTime(frequency, now + ramp);
-  state.drone.modulator.frequency.linearRampToValueAtTime(
-    droneType.value === "am" ? modHz : frequency * (0.5 + mod * 0.018),
-    now + ramp,
-  );
-  state.drone.modGain.gain.linearRampToValueAtTime(
-    droneType.value === "fm" ? mod * 1.8 : droneType.value === "am" ? mod * 0.0035 : 0,
-    now + ramp,
-  );
-  state.drone.filter.frequency.linearRampToValueAtTime(filterHz, now + ramp);
-  state.drone.filter.Q.linearRampToValueAtTime(0.5 + mod * 0.035, now + ramp);
-  state.drone.lfo.frequency.linearRampToValueAtTime(modHz, now + ramp);
-  state.drone.lfoGain.gain.linearRampToValueAtTime(color * 5, now + ramp);
-  state.drone.output.gain.linearRampToValueAtTime(level, now + ramp);
-}
-
-function ensureDroneState() {
-  if (!state.audioContext) return;
-  if (dronePower.checked && !state.drone) createDroneGraph();
-  else if (!dronePower.checked) disposeDrone();
-  else updateDroneParams();
 }
 
 function updateFX() {
   if (!state.audioContext || !state.fx.reverbSend) return;
   const now = state.audioContext.currentTime;
-  state.fx.reverbSend.gain.linearRampToValueAtTime(Number(fxControls.reverbSend.value) * 0.008, now + 0.05);
-  state.fx.delaySend.gain.linearRampToValueAtTime(Number(fxControls.delaySend.value) * 0.008, now + 0.05);
-  state.fx.delayNode.delayTime.linearRampToValueAtTime(
+  smoothParam(state.fx.reverbSend.gain, Number(fxControls.reverbSend.value) * 0.008, now);
+  smoothParam(state.fx.delaySend.gain, Number(fxControls.delaySend.value) * 0.008, now);
+  smoothParam(
+    state.fx.delayNode.delayTime,
     0.05 + Number(fxControls.delayTime.value) * 0.0145,
-    now + 0.05,
+    now,
   );
-  state.fx.delayFeedback.gain.linearRampToValueAtTime(Number(fxControls.delayFeed.value) * 0.0089, now + 0.05);
+  smoothParam(state.fx.delayFeedback.gain, Number(fxControls.delayFeed.value) * 0.0089, now);
 }
 
 let reverbRebuildTimer = null;
-let arpTimer = null;
 
-function stopArpTimer() {
-  clearInterval(arpTimer);
-  arpTimer = null;
-}
-
-async function startArpTimer() {
-  stopArpTimer();
-  if (!arpPower.checked) return;
-  if (!state.audioContext) await startAudio();
-  if (!state.drone) {
-    dronePower.checked = true;
-    createDroneGraph();
-  }
-  const ms = 60000 / clamp(Number(autoSeconds.value) || 120, 20, 400);
-  arpStep();
-  arpTimer = setInterval(() => arpStep(), ms);
-}
 function updateReverbSize() {
   if (!state.audioContext || !state.fx.convolver) return;
   clearTimeout(reverbRebuildTimer);
@@ -509,44 +352,6 @@ function updateReverbSize() {
     const size = Number(fxControls.reverbSize.value) / 100;
     state.fx.convolver.buffer = createImpulseResponse(state.audioContext, 0.4 + size * 4.6, 0.8 + size * 3.2);
   }, 300);
-}
-
-function arpStep() {
-  if (!state.audioContext) return;
-  if (!state.drone) {
-    dronePower.checked = true;
-    createDroneGraph();
-    return;
-  }
-  const scale = SCALES[arpScale.value] || SCALES.major;
-  const octaves = clamp(Number(arpOctaves.value) || 2, 1, 4);
-  const rootFreq = Number(droneNote.value);
-  const totalNotes = scale.length * octaves;
-  const scaleDegree = state.arpIndex % scale.length;
-  const octave = Math.floor(state.arpIndex / scale.length);
-  const freq = rootFreq * Math.pow(2, (scale[scaleDegree] + octave * 12) / 12);
-
-  const now = state.audioContext.currentTime;
-  state.drone.carrier.frequency.cancelScheduledValues(now);
-  state.drone.carrier.frequency.linearRampToValueAtTime(freq, now + 0.02);
-  if (droneType.value === "fm") {
-    const mod = Number(droneControls.mod.value);
-    state.drone.modulator.frequency.cancelScheduledValues(now);
-    state.drone.modulator.frequency.linearRampToValueAtTime(freq * (0.5 + mod * 0.018), now + 0.02);
-  }
-
-  if (arpMode.value === "up") {
-    state.arpIndex = (state.arpIndex + 1) % totalNotes;
-  } else if (arpMode.value === "down") {
-    state.arpIndex = (state.arpIndex - 1 + totalNotes) % totalNotes;
-  } else if (arpMode.value === "updown") {
-    state.arpIndex += state.arpDirection;
-    if (state.arpIndex >= totalNotes - 1) state.arpDirection = -1;
-    else if (state.arpIndex <= 0) state.arpDirection = 1;
-    state.arpIndex = clamp(state.arpIndex, 0, totalNotes - 1);
-  } else {
-    state.arpIndex = Math.floor(Math.random() * totalNotes);
-  }
 }
 
 async function startAudio() {
@@ -559,13 +364,17 @@ async function startAudio() {
     });
     const masterGain = audioContext.createGain();
     const compressor = audioContext.createDynamicsCompressor();
+    const monoOutput = audioContext.createGain();
     masterGain.gain.value = 0;
+    monoOutput.channelCount = 1;
+    monoOutput.channelCountMode = "explicit";
+    monoOutput.channelInterpretation = "speakers";
     compressor.threshold.value = -18;
     compressor.knee.value = 18;
     compressor.ratio.value = 10;
     compressor.attack.value = 0.004;
     compressor.release.value = 0.12;
-    worklet.connect(masterGain).connect(compressor).connect(audioContext.destination);
+    worklet.connect(masterGain).connect(compressor).connect(monoOutput).connect(audioContext.destination);
 
     // Reverb send
     const reverbSend = audioContext.createGain();
@@ -607,6 +416,7 @@ async function startAudio() {
     state.audioContext = audioContext;
     state.worklet = worklet;
     state.masterGain = masterGain;
+    state.monoOutput = monoOutput;
     state.compressor = compressor;
     state.fx = { reverbSend, reverbWet, convolver, delaySend, delayNode, delayFeedback, delayFilter, delayOut };
   }
@@ -614,23 +424,20 @@ async function startAudio() {
   await state.audioContext.resume();
   state.audioOn = true;
   const now = state.audioContext.currentTime;
-  state.masterGain.gain.cancelScheduledValues(now);
-  state.masterGain.gain.linearRampToValueAtTime(Number(masterVolume.value) * 0.006, now + 0.06);
+  smoothParam(state.masterGain.gain, masterTargetGain(), now, MASTER_RAMP);
   audioButton.setAttribute("aria-label", "Apagar sonido");
   audioButton.setAttribute("aria-pressed", "true");
   audioButton.textContent = "● SND";
   audioButton.classList.add("active");
   sendParams();
   sendPoints(true);
-  ensureDroneState();
 }
 
 function stopAudio() {
   if (!state.audioContext || !state.masterGain) return;
   const now = state.audioContext.currentTime;
   state.audioOn = false;
-  state.masterGain.gain.cancelScheduledValues(now);
-  state.masterGain.gain.linearRampToValueAtTime(0, now + 0.04);
+  smoothParam(state.masterGain.gain, 0, now, 0.05);
   audioButton.setAttribute("aria-label", "Prender sonido");
   audioButton.setAttribute("aria-pressed", "false");
   audioButton.textContent = "○ SND";
@@ -640,8 +447,7 @@ function stopAudio() {
 function updateMasterVolume() {
   if (!state.audioContext || !state.masterGain || !state.audioOn) return;
   const now = state.audioContext.currentTime;
-  state.masterGain.gain.cancelScheduledValues(now);
-  state.masterGain.gain.linearRampToValueAtTime(Number(masterVolume.value) * 0.006, now + 0.04);
+  smoothParam(state.masterGain.gain, masterTargetGain(), now, 0.05);
 }
 
 function toggleGrid() {
@@ -749,7 +555,7 @@ function drawBeamStep(points) {
 }
 
 function drawTextRaster() {
-  if (!state.textRaster.length || state.mode === "draw") return;
+  if (!state.textRaster.length) return;
   const warp = controlValue("warp", 0.003);
   const jitter = controlValue("jitter", 0.00055);
   const drift = controlValue("drift", 0.0005);
@@ -792,19 +598,6 @@ function drawTextRaster() {
   ctx.restore();
 }
 
-function drawCursor() {
-  if (!state.pointer || state.mode === "text") return;
-  const screen = denormalizePoint(state.pointer);
-  ctx.save();
-  ctx.fillStyle = "rgba(232, 255, 218, 0.92)";
-  ctx.shadowColor = "rgba(105, 255, 125, 0.9)";
-  ctx.shadowBlur = 16;
-  ctx.beginPath();
-  ctx.arc(screen.x, screen.y, state.pointerDown ? 5 : 3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
 function maybeAutoMutate() {
   if (!autoMutate.checked) return;
   const interval = 60000 / clamp(Number(autoSeconds.value) || 120, 20, 400);
@@ -825,26 +618,16 @@ function render() {
   ctx.restore();
   if (state.gridOn) drawGrid();
   state.cachedVisualPoints = modulatedPoints();
-  if (state.mode === "text" || state.mode === "mix") drawTextRaster();
-  if (state.mode !== "text") drawBeamStep(state.cachedVisualPoints);
-  drawCursor();
+  if (state.mode === "text") drawTextRaster();
+  if (state.mode === "wave") drawBeamStep(state.cachedVisualPoints);
   sendPoints();
   requestAnimationFrame(render);
 }
 
-function canvasPosition(event) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: ((event.clientX - rect.left) / rect.width) * canvas.width,
-    y: ((event.clientY - rect.top) / rect.height) * canvas.height,
-  };
-}
-
 function updateMode() {
   state.mode = activeMode();
-  liveTextBar.classList.toggle("hidden", state.mode === "draw" || state.mode === "wave");
+  liveTextBar.classList.toggle("hidden", state.mode === "wave");
   waveSection.classList.toggle("hidden", state.mode !== "wave");
-  canvas.classList.toggle("draw-mode", state.mode !== "text");
   state.beamIndex = 0;
   if (state.mode === "wave" && !state.wavePoints.length) rebuildWavePoints();
   sendPoints(true);
@@ -878,49 +661,8 @@ function setHelpOpen(open) {
 
 // --- Event listeners ---
 
-canvas.addEventListener("pointerdown", (event) => {
-  if (state.mode === "text") return;
-  state.pointerDown = true;
-  canvas.setPointerCapture(event.pointerId);
-  const position = canvasPosition(event);
-  const point = normalizePoint(position.x, position.y);
-  state.pointer = point;
-  state.currentStroke = [point];
-  state.drawStrokes.push(state.currentStroke);
-  if (state.drawStrokes.length > 24) state.drawStrokes.shift();
-  sendPoints(true);
-});
-
-canvas.addEventListener("pointermove", (event) => {
-  const position = canvasPosition(event);
-  const point = normalizePoint(position.x, position.y);
-  state.pointer = point;
-  if (!state.pointerDown || !state.currentStroke || state.mode === "text") return;
-  const last = state.currentStroke[state.currentStroke.length - 1];
-  if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 0.007) {
-    state.currentStroke.push(point);
-    if (state.currentStroke.length > 900) state.currentStroke.shift();
-    sendPoints(true);
-  }
-});
-
-function finishStroke() {
-  state.pointerDown = false;
-  state.currentStroke = null;
-}
-
-canvas.addEventListener("pointerup", finishStroke);
-canvas.addEventListener("pointercancel", finishStroke);
-canvas.addEventListener("lostpointercapture", finishStroke);
-
 liveTextInput.addEventListener("input", syncTextFromLive);
 audioButton.addEventListener("click", toggleAudio);
-clearButton.addEventListener("click", () => {
-  state.drawStrokes = [];
-  state.currentStroke = null;
-  state.beamIndex = 0;
-  sendPoints(true);
-});
 randomButton.addEventListener("click", mutateControls);
 configToggle.addEventListener("click", () => setConfigOpen(!configPanel.classList.contains("open")));
 gridToggle.addEventListener("click", toggleGrid);
@@ -932,28 +674,6 @@ helpPanel.addEventListener("click", (event) => {
   if (event.target === helpPanel) setHelpOpen(false);
 });
 modeInputs.forEach((input) => input.addEventListener("change", updateMode));
-
-dronePower.addEventListener("change", async () => {
-  if (dronePower.checked && !state.audioContext) await startAudio();
-  ensureDroneState();
-});
-droneType.addEventListener("change", () => {
-  if (state.drone) createDroneGraph();
-});
-droneNote.addEventListener("change", updateDroneParams);
-Object.values(droneControls).forEach((control) => {
-  control.addEventListener("input", updateDroneParams);
-});
-
-arpPower.addEventListener("change", async () => {
-  state.arpIndex = 0;
-  state.arpDirection = 1;
-  if (arpPower.checked) {
-    await startArpTimer();
-  } else {
-    stopArpTimer();
-  }
-});
 
 textImport.addEventListener("change", async (event) => {
   const file = event.target.files[0];
@@ -990,7 +710,6 @@ autoMutate.addEventListener("change", () => {
 autoSeconds.addEventListener("change", () => {
   autoSeconds.value = clamp(Number(autoSeconds.value) || 120, 20, 400);
   state.lastMutation = performance.now();
-  if (arpPower.checked) startArpTimer();
 });
 
 Object.values(controls).forEach((control) => {
@@ -1027,8 +746,7 @@ window.addEventListener("keydown", (event) => {
     event.preventDefault();
     if (state.masterGain && state.audioContext) {
       const now = state.audioContext.currentTime;
-      state.masterGain.gain.cancelScheduledValues(now);
-      state.masterGain.gain.linearRampToValueAtTime(0, now + 0.025);
+      smoothParam(state.masterGain.gain, 0, now, 0.025);
     }
   }
 });
@@ -1036,7 +754,6 @@ window.addEventListener("keydown", (event) => {
 // --- Init ---
 ctx.fillStyle = "#020604";
 ctx.fillRect(0, 0, canvas.width, canvas.height);
-buildNoteDropdown();
 updateMode();
 rebuildTextPoints();
 render();

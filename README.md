@@ -1,19 +1,16 @@
 # verdysynth
 
-Instrumento de audio vectorial para navegador. Genera formas de onda XY y las convierte en señal de audio estéreo, simulando un osciloscopio CRT en modo XY.
+Instrumento de audio vectorial para navegador. Genera recorridos X-Y, los dibuja como un osciloscopio CRT y entrega la mezcla final en mono.
 
 ## Modos
 
 - **CHAR GEN** — convierte texto en trayectoria de haz
-- **LIGHT PEN** — trazos vectoriales dibujados a mano
-- **MIX** — combina texto y dibujo
-- **WAVE GEN** — generador de ondas Lissajous, cuadrada, sierra y triángulo
+- **WAVE GEN** — dibuja curvas X-Y generadas por osciladores: Lissajous, cuadrada, sierra y triángulo. `FREQ X` y `FREQ Y` definen la relación horizontal/vertical, `FASE` desplaza el cruce entre ejes y `ARMÓNICOS` agrega esquinas o complejidad al trazo.
 
 ## Controles
 
 - **SND** — activa el motor de audio (WebAudio API)
-- **DRONE OSC** — oscilador continuo con tipos sine, saw, square, triangle, FM, AM
-- **ARPEGIO** — recorre notas de una escala sobre el drone, controlado por BPM
+- **VOL GENERAL** — único volumen continuo de salida
 - **AUTO** — muta parámetros automáticamente al ritmo del BPM configurado
 - **FX** — reverb y delay
 
