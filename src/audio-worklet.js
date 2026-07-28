@@ -15,6 +15,8 @@ class XYOscillatorProcessor extends AudioWorkletProcessor {
     this.prevRight = 0;
     this.dcLeft = 0;
     this.dcRight = 0;
+    this.levelSq = 0.01;
+    this.autoGain = 1;
 
     this.port.onmessage = (event) => {
       const data = event.data;
@@ -61,7 +63,14 @@ class XYOscillatorProcessor extends AudioWorkletProcessor {
       this.dcRight = hpRight;
       const dominant = Math.abs(hpLeft) > Math.abs(hpRight) ? hpLeft : hpRight;
       const hpMono = (hpLeft + hpRight) * 0.35 + dominant * 0.65;
-      mono[index] = Math.tanh(hpMono * 1.55) * 0.88;
+      const instantSq = hpMono * hpMono;
+      const levelCoeff = instantSq > this.levelSq ? 0.008 : 0.00025;
+      this.levelSq += (instantSq - this.levelSq) * levelCoeff;
+      const measuredRms = Math.sqrt(Math.max(this.levelSq, 0.000001));
+      const targetAutoGain = Math.max(0.35, Math.min(2.2, 0.095 / measuredRms));
+      const gainCoeff = targetAutoGain < this.autoGain ? 0.006 : 0.0005;
+      this.autoGain += (targetAutoGain - this.autoGain) * gainCoeff;
+      mono[index] = Math.tanh(hpMono * this.autoGain * 1.45) * 0.82;
 
       this.phase += increment;
       if (this.phase >= count) this.phase -= count;
